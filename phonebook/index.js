@@ -1,7 +1,14 @@
 const express = require('express')
+const morgan = require('morgan')
 const app = express()
 
+morgan.token('person', function getReqBody (request) {
+    return JSON.stringify(request.body)
+})
+
 app.use(express.json())
+app.use(morgan('tiny'))
+app.use(morgan(':person'))
 
 let persons = [
     { 
@@ -41,6 +48,64 @@ app.get('/api/info', (request, response) => {
         <p>${new Date()}</p>`
     )
 })
+
+app.get('/api/persons/:id', (request, response) => {
+    const id = Number(request.params.id)
+    const person = persons.find(person => person.id === id)
+
+    if (person) {
+        response.json(person)
+    } else {
+        response.status(404).end()
+    }
+    response.send(json(persons.filter(person => id === person.id)))    
+})
+
+app.delete('/api/persons/:id', (request, response) => {
+    const id = Number(request.params.id)
+    persons = persons.filter(person => person.id !== id)
+
+    response.status(204).end()
+})
+
+const generatedId = () => {
+    return Math.floor(Math.random() * 999999999)
+}
+
+app.post('/api/persons', (request, response) => {
+    const body = request.body
+
+    if (!body.name) {
+        return response.status(400).json({
+            error: 'name missing'
+        })
+    }
+    if (!body.number) {
+        return response.status(400).json({
+            error: 'number missing'
+        })
+    }
+    if (persons.find(person => person.name === body.name)) {
+        return response.status(400).json({
+            error: 'name already exists in db, names must be unique'
+        })
+    }
+
+    const person = {
+        name: body.name, 
+        number: body.number, 
+        id: generatedId()
+    }
+
+    persons = persons.concat(person)
+    response.json(person)
+})
+
+const unknownEndpoint = (request, response) => {
+    response.status(404).send({ error: 'unknown endpoint' })
+}
+
+app.use(unknownEndpoint)
 
 const PORT = 3001
 app.listen(PORT, () => {
